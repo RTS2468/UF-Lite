@@ -1,0 +1,10 @@
+# Gate Profile (YAML)
+# Declare thresholds and methods you will use in this project.
+profile_id: ""
+harm_cap: {high: 0.01, medium: 0.05, low: 0.10}
+consent: {threshold: 0.80, note: "explicit for human-affecting changes"}
+fairness: {metric: "TV/KL bound", cap: 0.05}
+honesty: {evidence_gap_cap: 0.05, sources: ["public records", "official docs"]}
+bias_opacity: {independent_review: true, reasons_required: 2}
+reversibility: {required: true, notes: "prefer pilot before rollout"}
+notes: "Tune these to the stakes and context."

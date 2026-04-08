@@ -1,0 +1,3 @@
+UF Potentials Studio — Licensing
+- Documentation (markdown/PDF): CC BY-NC-ND 4.0
+- Reference code/snippets: MIT License

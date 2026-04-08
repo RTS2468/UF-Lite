@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "entities": {
+    "Claim": {
+      "fields": [
+        "id",
+        "speaker",
+        "date",
+        "topic",
+        "proposition",
+        "support_evidence",
+        "EG",
+        "sources"
+      ]
+    },
+    "Promise": {
+      "fields": [
+        "id",
+        "scope",
+        "due_date",
+        "criteria",
+        "status",
+        "weight",
+        "sources"
+      ]
+    },
+    "Action": {
+      "fields": [
+        "id",
+        "date",
+        "type",
+        "description",
+        "impacted_groups",
+        "gate_scores",
+        "sources"
+      ]
+    }
+  }
+}
