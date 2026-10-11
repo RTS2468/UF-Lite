@@ -1,0 +1,39 @@
+{
+  "subject": "Example City Council",
+  "topic": "Public transit",
+  "dates_covered": "2025-01-01 to 2025-06-30",
+  "claims": [
+    {"id": "C1", "speaker": "Council Chair", "date": "2025-02-10", "topic": "transit",
+     "proposition": "Bus ridership rose 12% last year.",
+     "support_evidence": ["Annual transit report, p. 4"], "EG": 0.0,
+     "sources": ["https://example.org/transit-report-2024"]},
+    {"id": "C2", "speaker": "Council Member A", "date": "2025-03-02", "topic": "transit",
+     "proposition": "The new route will cut commute times in half.",
+     "support_evidence": [], "EG": 0.8, "sources": []},
+    {"id": "C3", "speaker": "Transit Director", "date": "2025-04-15", "topic": "transit",
+     "proposition": "Fare revenue covers 30% of operating costs.",
+     "support_evidence": ["Budget filing FY25"], "EG": 0.2,
+     "sources": ["https://example.org/budget-fy25"]}
+  ],
+  "promises": [
+    {"id": "P1", "scope": "Add 3 new bus routes", "due_date": "2025-06-01",
+     "criteria": "Routes in service", "status": "kept", "weight": 2,
+     "sources": ["https://example.org/press/routes"]},
+    {"id": "P2", "scope": "Install 50 bus shelters", "due_date": "2025-05-01",
+     "criteria": "Shelters installed", "status": "partial", "weight": 1, "sources": []},
+    {"id": "P3", "scope": "Freeze fares", "due_date": "2025-12-31",
+     "criteria": "No fare increase", "status": "pending", "weight": 1, "sources": []}
+  ],
+  "actions": [
+    {"id": "A1", "date": "2025-03-20", "type": "ordinance",
+     "description": "Approved route expansion pilot",
+     "impacted_groups": {"downtown": 0.6, "suburbs": 0.4},
+     "gate_scores": {"H": 1, "C": 0.9, "F": 0.8, "EG": 1, "B": 0.9, "O": 0.8, "RV": 1},
+     "sources": ["https://example.org/minutes/2025-03-20"]},
+    {"id": "A2", "date": "2025-05-05", "type": "budget",
+     "description": "Cut late-night service",
+     "impacted_groups": {"downtown": -0.2, "suburbs": -0.6},
+     "gate_scores": {"H": 0.7, "C": 0.5, "F": 0.4, "EG": 0.8, "B": 0.6, "O": 0.5, "RV": 0.9},
+     "sources": []}
+  ]
+}

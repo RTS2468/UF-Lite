@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TruthAuditTemplate",
+  "type": "object",
+  "required": [
+    "metadata",
+    "claims",
+    "sessions"
+  ],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": [
+        "project",
+        "created_at",
+        "author"
+      ],
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "author": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "date",
+          "source",
+          "text",
+          "category"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "mission",
+              "capability",
+              "policy",
+              "safety",
+              "opener",
+              "memory",
+              "truthfulness",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "platform",
+          "turns"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "role",
+                "text"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "model"
+                  ]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "ts": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
