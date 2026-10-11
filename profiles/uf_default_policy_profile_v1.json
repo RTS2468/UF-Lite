@@ -1,0 +1,27 @@
+{
+  "name": "UF_Default_Policy_Profile_v1",
+  "purpose_weights": {
+    "self": 0.3,
+    "right": 0.4,
+    "help": 0.3
+  },
+  "harm_caps": {
+    "low": 0.1,
+    "med": 0.05,
+    "high": 0.01
+  },
+  "consent_thresholds": {
+    "sr_tau": 0.8,
+    "consent_tau": 0.75
+  },
+  "fairness_prior": "equal_opportunity",
+  "reversibility_weight": 0.6,
+  "red_lines": [
+    "non-consensual_harm",
+    "exceed_bias_cap",
+    "opacity_breach"
+  ],
+  "evidence_gap_cap": 0.05,
+  "bias_cap": 0.05,
+  "opacity_cap": 0.01
+}
