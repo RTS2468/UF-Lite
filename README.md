@@ -16,16 +16,17 @@ pytest                      # run the test suite
 from uf_lite import UFMiddleware, AuditLogger, load_profile
 
 mw = UFMiddleware(load_profile("gate_profile.yaml"), audit_logger=AuditLogger("logs/audit.jsonl"))
-print(mw.start_session())                        # Genesis Boot line
+print(mw.start_session())  # Genesis Boot line
 
 report = mw.process(llm_output, {"stakes": "medium", "consent": False, "sources": []})
-send(report.final_output)                        # gated output
+send(report.final_output)  # gated output
 for f in report.failures:
     print(f.gate_id, f.action.value, f.reasons)
 ```
 Or the drop-in function (backwards compatible with the original `middleware_filter.py`):
 ```python
 from middleware_filter import uf_middleware
+
 final = uf_middleware(candidate_response, {"profile": "gate_profile.yaml"})
 ```
 See `simple_bot_example.py` for a runnable bot loop (`python simple_bot_example.py`).
@@ -59,6 +60,7 @@ How the built-in gates decide (`uf_lite/gates.py`):
 The built-in checks are rule-based heuristics, a floor rather than a classifier. Replace any gate with your own (e.g. an LLM judge):
 ```python
 from uf_lite import CallableGate, FailureAction, UFMiddleware
+
 judge = CallableGate("G1", "Non-Harm (LLM)", FailureAction.BLOCK, lambda text, ctx: my_judge(text))
 mw = UFMiddleware(overrides={"G1": judge})
 ```

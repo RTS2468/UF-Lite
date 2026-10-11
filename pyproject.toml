@@ -13,7 +13,7 @@ authors = [{name = "Richard Siano"}]
 dependencies = ["PyYAML>=6.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "ruff>=0.4"]
+dev = ["pytest>=7", "ruff==0.17.0"]
 
 [project.scripts]
 uf-lite = "uf_lite.cli:main"
