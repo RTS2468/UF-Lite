@@ -100,7 +100,7 @@ def test_proportionality_scales_down_shouting(ctx):
 def test_proportionality_max_chars():
     ctx = GateContext(profile=GateProfile(max_response_chars=20))
     r = ProportionalityGate().check("one two three four five six seven eight", ctx)
-    assert not r.passed and len(r.output) <= 21
+    assert not r.passed and len(r.output) <= 20
 
 
 def test_reversibility(ctx):
@@ -120,3 +120,25 @@ def test_callable_gate_forms(ctx):
     )
     r = as_tuple.check("anything", ctx)
     assert r.output == "fixed" and r.reasons == ["x"]
+
+
+def test_fairness_removes_generalization_in_long_reply(ctx):
+    text = "Immigrants are lazy. " + " ".join(["Okay."] * 30)
+    r = FairnessGate().check(text, ctx)
+    assert not r.passed and "lazy" not in r.output
+
+
+def test_proportionality_calms_alarm_words(ctx):
+    ctx.stakes = "low"
+    gate = ProportionalityGate()
+    r = gate.check("Emergency! Act now!", ctx)
+    assert not r.passed
+    assert "Emergency" not in r.output and "!" not in r.output
+    assert gate.intensity(r.output) <= gate.INTENSITY_CAP["low"]
+
+
+def test_reversibility_advisory_respects_max_chars():
+    ctx = GateContext(profile=GateProfile(max_response_chars=80))
+    r = ReversibilityGate().check("Delete all your files permanently and then reinstall.", ctx)
+    assert not r.passed and len(r.output) <= 80
+    assert ReversibilityGate.SHORT_ADVISORY in r.output

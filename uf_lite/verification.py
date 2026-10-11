@@ -125,13 +125,26 @@ def expected_harm(subjects: list[SubjectRisk]) -> float:
 
 
 def cvar(losses: list[float], alpha: float) -> float:
-    """CVaR_alpha (mean of the worst 1 - alpha tail) for losses in [0, 1]."""
+    """CVaR_alpha (mean of the worst 1 - alpha tail) for losses in [0, 1].
+
+    The boundary sample contributes only its fractional share of the tail mass.
+    """
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"alpha must be in [0, 1], got {alpha}")
     if not losses:
         return 0.0
-    xs = sorted(max(0.0, min(1.0, x)) for x in losses)
-    k = min(max(int(math.ceil(alpha * len(xs))), 1), len(xs))
-    tail = xs[k - 1 :]
-    return sum(tail) / len(tail)
+    xs = sorted((max(0.0, min(1.0, x)) for x in losses), reverse=True)
+    tail_mass = (1.0 - alpha) * len(xs)
+    if tail_mass <= 1e-12:
+        return xs[0]
+    total, remaining = 0.0, tail_mass
+    for x in xs:
+        weight = min(1.0, remaining)
+        total += weight * x
+        remaining -= weight
+        if remaining <= 1e-12:
+            break
+    return total / tail_mass
 
 
 def fsd_dominates(loss_a: list[float], loss_b: list[float]) -> bool:
@@ -175,8 +188,9 @@ def verify_action(
 
     try:
         datetime.fromisoformat(action.timestamp.replace("Z", "+00:00"))
-    except ValueError:
-        reasons.append("invalid timestamp format")
+        timestamp_ok = True
+    except (ValueError, AttributeError):
+        timestamp_ok = False
 
     alignment = signals.R / (signals.R + signals.D + cfg.DELTA)
     misalignment = 1.0 - alignment
@@ -200,6 +214,7 @@ def verify_action(
         "fairness": fairness_kl <= profile.fairness_cap + eps,
         "evidence": evidence_kl <= profile.honesty_evidence_gap_cap + eps,
         "harm_cap": harm <= harm_cap + eps,
+        "timestamp": timestamp_ok,
     }
 
     dominance_ok = None
@@ -210,13 +225,7 @@ def verify_action(
     if misalignment >= 1.0 - eps:
         label, severity, verdict = "Evil", "S2", "fail"
         reasons.append("100% misalignment endpoint")
-    elif (
-        alignment >= 1.0 - eps
-        and harm <= eps
-        and all(
-            checks[k] for k in ("bias", "opacity", "ethical_compliance", "fairness", "evidence")
-        )
-    ):
+    elif alignment >= 1.0 - eps and harm <= eps and all(checks.values()):
         label = "Good*"
         if not action.evidence:
             severity, verdict = "S1", "escalate"
@@ -225,7 +234,7 @@ def verify_action(
         comparative_ok = relief_index >= cfg.RI_MIN - eps or dominance_ok is True
         if not (all(checks.values()) and comparative_ok):
             label = "Wrong"
-            hard = ("ethical_compliance", "fairness", "consent", "harm_cap")
+            hard = ("ethical_compliance", "fairness", "consent", "harm_cap", "timestamp")
             hard_fail = not all(checks[k] for k in hard)
             severity = "S2" if hard_fail else "S1"
             verdict = "fail" if hard_fail else "escalate"
@@ -239,6 +248,7 @@ def verify_action(
         "fairness": "fairness KL cap exceeded",
         "evidence": "evidence gap (KL claim||evidence) exceeded",
         "harm_cap": f"harm exceeds cap for stakes={action.stakes}",
+        "timestamp": "invalid timestamp format",
     }
     reasons += [messages[k] for k, ok in checks.items() if not ok]
 
@@ -263,6 +273,7 @@ def verify_action(
         "action": asdict(action),
         "signals": asdict(signals),
         "profile_id": profile.profile_id,
+        "profile": asdict(profile),
         "baseline_harm": baseline_harm,
         "cfg": asdict(cfg),
         "result": {"verdict": verdict, "label": label, "severity": severity, "reasons": reasons},

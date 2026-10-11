@@ -5,6 +5,8 @@ from uf_lite import (
     AuditLogger,
     CallableGate,
     FailureAction,
+    GateContext,
+    GateProfile,
     UFMiddleware,
     genesis_boot,
     uf_middleware,
@@ -65,3 +67,23 @@ def test_audit_log_jsonl(tmp_path):
     assert lines[0]["passed"] is True and "original" not in lines[0]
     assert lines[1]["continuity_violation"] is True
     assert lines[0]["session_id"] == mw.session_id
+
+
+def test_max_chars_holds_after_all_gates():
+    mw = UFMiddleware({"max_response_chars": 20})
+    out = mw("Delete all your files permanently.", {"stakes": "low"})
+    assert len(out) <= 20
+
+
+def test_default_gate_context_uses_middleware_profile():
+    mw = UFMiddleware({"consent_threshold": 0.0})
+    assert mw.process("I have sent the email.", GateContext()).passed
+    assert mw.process("I have sent the email.", {}).passed
+    explicit = GateContext(profile=GateProfile(consent_threshold=0.9))
+    assert not mw.process("I have sent the email.", explicit).passed
+
+
+def test_custom_block_without_output_hides_response():
+    blocker = CallableGate("G1", "Custom", FailureAction.BLOCK, lambda text, ctx: False)
+    report = UFMiddleware(overrides={"G1": blocker}).process("secret rejected text")
+    assert report.blocked and "secret rejected text" not in report.final_output

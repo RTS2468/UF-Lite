@@ -40,7 +40,8 @@ class GateContext:
     group_outcomes: {group: {outcome: probability}} for the TV/KL fairness bound (G4).
     """
 
-    profile: GateProfile = field(default_factory=GateProfile)
+    profile: GateProfile | None = None
+    """None means "use the middleware's profile" (or the defaults when used directly)."""
     user_input: str = ""
     stakes: str | None = None
     consent: bool | float | None = None
@@ -50,6 +51,12 @@ class GateContext:
     reasons: Sequence[str] = ()
     group_outcomes: Mapping[str, Mapping[str, float]] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    profile_explicit: bool = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        self.profile_explicit = self.profile is not None
+        if self.profile is None:
+            self.profile = GateProfile()
 
     @property
     def effective_stakes(self) -> str:
@@ -278,7 +285,7 @@ class FairnessGate(Gate):
                 )
 
         score = max(text_score, dist_score)
-        passed = score <= ctx.profile.fairness_cap
+        passed = not flagged and dist_score <= ctx.profile.fairness_cap
         kept = [s for s in sentences if s not in flagged]
         output = " ".join(kept).strip()
         note = "Note: generalizations about groups of people were removed."
@@ -343,6 +350,22 @@ class ProportionalityGate(Gate):
         re.IGNORECASE,
     )
     SHOUT = re.compile(r"\b[A-Z]{3,}\b")
+    CALM = {
+        "emergency": "important issue",
+        "catastrophic": "serious",
+        "catastrophically": "seriously",
+        "catastrophe": "serious problem",
+        "disaster": "serious problem",
+        "urgent": "important",
+        "urgently": "promptly",
+        "immediately": "promptly",
+        "panic": "concern",
+        "terrifying": "concerning",
+        "life-threatening": "serious",
+        "life threatening": "serious",
+        "act now": "consider acting soon",
+        "right now": "soon",
+    }
     INTENSITY_CAP = {"low": 0.15, "medium": 0.3, "high": 0.6}
 
     def intensity(self, text: str) -> float:
@@ -354,14 +377,33 @@ class ProportionalityGate(Gate):
         bangs = len(re.findall(r"!{2,}", text)) + 0.5 * text.count("!")
         return min(1.0, (2 * alarms + shouts + bangs) / len(words) * 5)
 
+    @classmethod
+    def calm(cls, text: str) -> str:
+        """Replace alarm terms with measured wording and drop exclamation marks."""
+
+        def repl(m: re.Match) -> str:
+            word = m.group(0)
+            key = re.sub(r"\s+", " ", word.lower())
+            calm = cls.CALM.get(key, cls.CALM.get(key.rstrip("s"), "notable"))
+            return calm[0].upper() + calm[1:] if word[0].isupper() else calm
+
+        out = cls.ALARM.sub(repl, text)
+        return re.sub(r"!+", ".", out)
+
     @staticmethod
-    def scale_down(text: str, max_chars: int | None) -> str:
+    def truncate(text: str, max_chars: int | None) -> str:
+        if max_chars and len(text) > max_chars:
+            cut = text[: max_chars - 1].rsplit(" ", 1)[0]
+            return cut.rstrip(" ,;:") + "…"
+        return text
+
+    @staticmethod
+    def scale_down(text: str, max_chars: int | None, calm: bool = False) -> str:
         out = re.sub(r"!{2,}", "!", text)
         out = ProportionalityGate.SHOUT.sub(lambda m: m.group(0).capitalize(), out)
-        if max_chars and len(out) > max_chars:
-            cut = out[:max_chars].rsplit(" ", 1)[0]
-            out = cut.rstrip(" ,;:") + "…"
-        return out
+        if calm:
+            out = ProportionalityGate.calm(out)
+        return ProportionalityGate.truncate(out, max_chars)
 
     def check(self, text: str, ctx: GateContext) -> GateResult:
         stakes = ctx.effective_stakes
@@ -374,7 +416,7 @@ class ProportionalityGate(Gate):
         if max_chars and len(text) > max_chars:
             reasons.append(f"length {len(text)} exceeds max_response_chars {max_chars}")
         passed = not reasons
-        return self._result(passed, score, reasons, self.scale_down(text, max_chars))
+        return self._result(passed, score, reasons, self.scale_down(text, max_chars, score > cap))
 
 
 # --------------------------------------------------------------------------- G7
@@ -392,16 +434,30 @@ class ReversibilityGate(Gate):
         "Caution: this step may not be reversible. Prefer a reversible option first "
         "(back up, try a small pilot, or do a dry run) before committing."
     )
+    SHORT_ADVISORY = "Caution: may be irreversible; prefer a reversible option first."
 
     def check(self, text: str, ctx: GateContext) -> GateResult:
         if not ctx.profile.reversibility_required or ctx.reversible is True:
             return self._result(True)
         matches = [m.group(0) for m in self.IRREVERSIBLE.finditer(text)]
         irreversible = bool(matches) or ctx.reversible is False
-        if not irreversible or self.ADVISORY in text:
+        if not irreversible or self.ADVISORY in text or self.SHORT_ADVISORY in text:
             return self._result(True)
         reasons = [f"irreversible step: {m!r}" for m in matches] or ["marked irreversible"]
-        return self._result(False, 1.0, reasons, f"{text.rstrip()}\n\n{self.ADVISORY}")
+        return self._result(False, 1.0, reasons, self.with_advisory(text, ctx))
+
+    def with_advisory(self, text: str, ctx: GateContext) -> str:
+        """Append the advisory, keeping the result within ``max_response_chars``."""
+        max_chars = ctx.profile.max_response_chars
+        full = f"{text.rstrip()}\n\n{self.ADVISORY}"
+        if not max_chars or len(full) <= max_chars:
+            return full
+        advisory = self.ADVISORY if len(self.ADVISORY) * 2 <= max_chars else self.SHORT_ADVISORY
+        room = max_chars - len(advisory) - 2
+        if room < 10:
+            return advisory[:max_chars]
+        body = ProportionalityGate.truncate(text.rstrip(), room)
+        return f"{body}\n\n{advisory}"
 
 
 # --------------------------------------------------------------------------- G8

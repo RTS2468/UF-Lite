@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, replace
 from typing import Any
 
 from .audit import AuditLogger
-from .gates import FailureAction, Gate, GateContext, GateResult, default_gates
+from .gates import FailureAction, Gate, GateContext, GateResult, NonHarmGate, default_gates
 from .profile import GateProfile, coerce_profile
 
 GENESIS_STATEMENT = "I am a new instance with no prior continuity. This is a fresh session."
@@ -47,7 +47,7 @@ class GateReport:
         }
 
 
-_CONTEXT_FIELDS = {f.name for f in fields(GateContext)} - {"profile", "metadata"}
+_CONTEXT_FIELDS = {f.name for f in fields(GateContext) if f.init} - {"profile", "metadata"}
 
 
 class UFMiddleware:
@@ -79,7 +79,9 @@ class UFMiddleware:
 
     def build_context(self, context: Mapping[str, Any] | GateContext | None) -> GateContext:
         if isinstance(context, GateContext):
-            return context
+            if context.profile_explicit:
+                return context
+            return replace(context, profile=self.profile)
         context = dict(context or {})
         profile = coerce_profile(context.pop("profile", None) or self.profile)
         known = {k: context.pop(k) for k in list(context) if k in _CONTEXT_FIELDS}
@@ -107,6 +109,8 @@ class UFMiddleware:
                     text = result.output
                 if not result.passed and result.action is FailureAction.BLOCK:
                     report.blocked = True
+                    if result.output is None:
+                        text = NonHarmGate.REFUSAL
                     break
             report.final_output = text
 

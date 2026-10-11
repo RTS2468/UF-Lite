@@ -18,7 +18,7 @@ def action(**kw):
 
 def test_risk_helpers():
     assert expected_harm([]) == 0.0
-    assert cvar([0.0, 0.1, 0.2, 0.9], 0.75) == pytest.approx(0.55)
+    assert cvar([0.0, 0.1, 0.2, 0.9], 0.75) == pytest.approx(0.9)
     assert fsd_dominates([0.0, 0.1], [0.2, 0.3])
     assert not fsd_dominates([0.2, 0.3], [0.0, 0.1])
 
@@ -65,3 +65,44 @@ def test_stakes_alias_and_example_file():
     assert rep.metrics["risk_mode"] == "cvar"
     assert rep.metrics["dominance_ok"] is True
     assert rep.metrics["fairness_tv_bound"] == pytest.approx((0.5 * 0.01) ** 0.5)
+
+
+def test_cvar_exact_tail_weighting():
+    assert cvar([0.0] * 9 + [1.0], 0.9) == pytest.approx(1.0)
+    assert cvar([0.0, 0.5, 1.0, 1.0], 0.5) == pytest.approx(1.0)
+    # tail mass 1.5: one full 1.0 plus half of 0.5
+    assert cvar([0.0, 0.5, 1.0], 0.5) == pytest.approx((1.0 + 0.25) / 1.5)
+    assert cvar([0.2, 0.7], 1.0) == pytest.approx(0.7)
+    assert cvar([0.2, 0.7], 0.0) == pytest.approx(0.45)
+    with pytest.raises(ValueError):
+        cvar([0.1], 1.5)
+
+
+SAFE = dict(p=0, s=0, d=0, r=0, k=0, w=1)
+
+
+def _zero_harm_action(**kw):
+    base = dict(subjects=[SubjectRisk(consent=1.0, **SAFE)], evidence=[{"uri": "ref"}])
+    base.update(kw)
+    return action(**base)
+
+
+def test_good_star_requires_every_check():
+    assert verify_action(_zero_harm_action()).verdict == "pass"
+    passion = verify_action(_zero_harm_action(), Signals(passion=1.0))
+    assert passion.verdict != "pass" and "passion cap exceeded" in passion.reasons
+    no_consent = _zero_harm_action(subjects=[SubjectRisk(consent=0.0, **SAFE)])
+    report = verify_action(no_consent)
+    assert report.verdict == "fail" and report.action_label == "Wrong"
+
+
+def test_invalid_timestamp_cannot_pass():
+    report = verify_action(_zero_harm_action(timestamp="garbage"))
+    assert report.verdict == "fail"
+    assert "invalid timestamp format" in report.reasons
+
+
+def test_proof_covers_profile_thresholds():
+    a = verify_action(_zero_harm_action(), profile=GateProfile(consent_threshold=0.2))
+    b = verify_action(_zero_harm_action(), profile=GateProfile(consent_threshold=0.9))
+    assert a.verdict == b.verdict and a.proof != b.proof
